@@ -178,7 +178,6 @@ async def process_account(account: dict, account_idx: int, result_lines: list):
             end_date = conf.get("end_date")
 
             if not is_coin_active(start_date, end_date):
-                result_lines.append(f"⏸️ {pair} ({start_date}~{end_date}) 기간외")
                 continue
 
             try:
