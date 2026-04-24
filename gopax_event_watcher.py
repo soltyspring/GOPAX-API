@@ -101,9 +101,8 @@ def parse_nbang_event(notice: dict):
     else:
         start = end = None
 
-    # 최소 거래금액
-    amount_match = re.search(r'(\d+)만원', event_section)
-    min_krw = int(amount_match.group(1)) * 10000 if amount_match else 100000
+    # 최소 거래금액: 보상/지급 금액보다 "거래", "이상" 주변 금액을 우선합니다.
+    min_krw = extract_min_trade_krw(event_section, coin)
 
     return {
         'notice_id': notice['id'],
@@ -114,6 +113,41 @@ def parse_nbang_event(notice: dict):
         'min_krw': min_krw,
         'event_type': event_type,
     }
+
+def parse_krw_amount(number_text: str, unit: str) -> int:
+    number = float(number_text.replace(',', ''))
+    if unit == '만원':
+        return int(number * 10000)
+    return int(number)
+
+def extract_min_trade_krw(text: str, coin: str | None) -> int:
+    amount_pattern = re.compile(r'(\d+(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(만원|원)')
+    candidates = []
+
+    for match in amount_pattern.finditer(text):
+        start, end = match.span()
+        window = text[max(0, start - 80):min(len(text), end + 80)]
+        score = 0
+
+        if '거래' in window:
+            score += 5
+        if '이상' in window:
+            score += 3
+        if any(keyword in window for keyword in ('매수', '매도', '합산', '일별', '매일')):
+            score += 2
+        if coin and coin.split('-')[0] in window:
+            score += 2
+        if any(keyword in window for keyword in ('보상', '지급', '리워드', '혜택', '당첨', '상금')):
+            score -= 4
+
+        amount = parse_krw_amount(match.group(1), match.group(2))
+        candidates.append((score, amount, match.group(0), window))
+
+    if not candidates:
+        return 100000
+
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return candidates[0][1]
 
 def load_seen():
     if SEEN_PATH.exists():
