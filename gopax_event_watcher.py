@@ -104,18 +104,31 @@ def extract_coin(title: str, text: str) -> str | None:
 
 def extract_event_section(text: str, event_type: str, coin: str | None) -> str:
     symbol = coin.split('-')[0] if coin else None
-    keywords = []
+    primary_keywords = []
+    fallback_keywords = []
 
     if event_type == 'N빵':
         if symbol:
-            keywords.append(f'{symbol} N빵')
-        keywords.extend(['N빵 리워드', 'N빵 이벤트', '매일 거래 N빵', 'N빵'])
+            primary_keywords.append(f'{symbol} N빵')
+        primary_keywords.extend(['N빵 리워드', 'N빵 이벤트', '매일 거래 N빵', 'N빵'])
     else:
         if symbol:
-            keywords.append(f'{symbol} 매일 딸깍')
-        keywords.extend(['매일 딸깍 거래 이벤트', '매일 딸깍'])
+            primary_keywords.append(f'{symbol} 매일 딸깍')
+        primary_keywords.extend([
+            '매일 딸깍 거래 이벤트',
+            '매일 딸깍',
+        ])
+        fallback_keywords.extend([
+            '일일 참여 최소 거래량',
+            '일별 최소 거래량',
+        ])
 
-    positions = [text.find(keyword) for keyword in keywords if text.find(keyword) != -1]
+    content_start = text.find('\n') + 1
+    positions = find_keyword_positions(text, primary_keywords, content_start)
+    if not positions:
+        positions = find_keyword_positions(text, fallback_keywords, content_start)
+    if not positions:
+        positions = find_keyword_positions(text, primary_keywords + fallback_keywords, 0)
     if not positions:
         return text
 
@@ -130,6 +143,19 @@ def extract_event_section(text: str, event_type: str, coin: str | None) -> str:
     if end_positions:
         return tail[:min(end_positions)]
     return tail
+
+def find_keyword_positions(text: str, keywords: list[str], min_position: int) -> list[int]:
+    positions = []
+    for keyword in keywords:
+        start = 0
+        while True:
+            position = text.find(keyword, start)
+            if position == -1:
+                break
+            if position >= min_position:
+                positions.append(position)
+            start = position + len(keyword)
+    return positions
 
 def extract_event_dates(text: str) -> tuple[str | None, str | None]:
     date_match = re.search(
@@ -162,6 +188,18 @@ def parse_krw_amount(number_text: str, unit: str) -> int:
 
 def extract_min_trade_krw(text: str, coin: str | None) -> int:
     amount_pattern = re.compile(r'(\d+(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(만\s*원|만원|원)')
+    symbol = coin.split('-')[0] if coin else r'[A-Z]{2,10}'
+    trade_patterns = [
+        rf'(?:일일|일별)?\s*(?:참여\s*)?최소\s*거래량[^:：]*[:：]?\s*.*?(\d+(?:,\d{{3}})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(만\s*원|만원|원)\s*이상[^.\n]*{symbol}[^.\n]*거래',
+        rf'(\d+(?:,\d{{3}})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(만\s*원|만원|원)\s*이상[^.\n]*{symbol}[^.\n]*거래',
+        rf'{symbol}[^.\n]*?(\d+(?:,\d{{3}})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(만\s*원|만원|원)\s*이상[^.\n]*거래',
+    ]
+
+    for pattern in trade_patterns:
+        match = re.search(pattern, text)
+        if match:
+            return parse_krw_amount(match.group(1), match.group(2))
+
     candidates = []
 
     for match in amount_pattern.finditer(text):
