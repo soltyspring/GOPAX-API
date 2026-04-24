@@ -65,41 +65,18 @@ def parse_nbang_event(notice: dict):
 
     # N빵 또는 매일 딸깍 이벤트 감지
     event_type = None
-    if 'N빵' in text:
-        event_type = 'N빵'
-    elif '매일 딸깍' in text:
+    if '매일 딸깍' in text:
         event_type = '매일 딸깍'
+    elif 'N빵' in text:
+        event_type = 'N빵'
     else:
         return None
 
-    # 코인명 추출 (제목에서 괄호 안 심볼)
-    coin_match = re.search(r'\(([A-Z]{2,10})\)', title)
-    coin = coin_match.group(1) + '-KRW' if coin_match else None
-
-    # 이벤트 섹션 찾기
-    section_keywords = [
-        '매일 거래 N빵', 'N빵 이벤트',          # N빵 계열
-        '매일 딸깍 거래 이벤트', '매일 딸깍',    # 매일 딸깍 계열
-    ]
-    idx = -1
-    for kw in section_keywords:
-        idx = text.find(kw)
-        if idx != -1:
-            break
-    if idx == -1:
-        idx = 0  # 섹션 못 찾으면 전체 텍스트 대상
-    event_section = text[idx:]
+    coin = extract_coin(title, text)
+    event_section = extract_event_section(text, event_type, coin)
 
     # 날짜 파싱
-    date_match = re.search(
-        r'(\d{4})\.(\d{2})\.(\d{2})\([^\)]+\)[^~]*~[^0-9]*(\d{4})\.(\d{2})\.(\d{2})',
-        event_section
-    )
-    if date_match:
-        start = f"{date_match.group(1)}-{date_match.group(2)}-{date_match.group(3)}"
-        end   = f"{date_match.group(4)}-{date_match.group(5)}-{date_match.group(6)}"
-    else:
-        start = end = None
+    start, end = extract_event_dates(text)
 
     # 최소 거래금액: 보상/지급 금액보다 "거래", "이상" 주변 금액을 우선합니다.
     min_krw = extract_min_trade_krw(event_section, coin)
@@ -114,14 +91,77 @@ def parse_nbang_event(notice: dict):
         'event_type': event_type,
     }
 
+def extract_coin(title: str, text: str) -> str | None:
+    coin_match = re.search(r'\(([A-Z]{2,10})\)', title)
+    if coin_match:
+        return coin_match.group(1) + '-KRW'
+
+    coin_match = re.search(r'\b([A-Z]{2,10})\s*(?:N빵|매일 딸깍|데일리|리뉴얼|거래)', text)
+    if coin_match:
+        return coin_match.group(1) + '-KRW'
+
+    return None
+
+def extract_event_section(text: str, event_type: str, coin: str | None) -> str:
+    symbol = coin.split('-')[0] if coin else None
+    keywords = []
+
+    if event_type == 'N빵':
+        if symbol:
+            keywords.append(f'{symbol} N빵')
+        keywords.extend(['N빵 리워드', 'N빵 이벤트', '매일 거래 N빵', 'N빵'])
+    else:
+        if symbol:
+            keywords.append(f'{symbol} 매일 딸깍')
+        keywords.extend(['매일 딸깍 거래 이벤트', '매일 딸깍'])
+
+    positions = [text.find(keyword) for keyword in keywords if text.find(keyword) != -1]
+    if not positions:
+        return text
+
+    start = min(positions)
+    tail = text[start:]
+    end_positions = []
+    for pattern in (r'\d+\.\s', r'※', r'감사합니다'):
+        end_match = re.search(pattern, tail[1:])
+        if end_match:
+            end_positions.append(end_match.start() + 1)
+
+    if end_positions:
+        return tail[:min(end_positions)]
+    return tail
+
+def extract_event_dates(text: str) -> tuple[str | None, str | None]:
+    date_match = re.search(
+        r'(\d{4})\.(\d{2})\.(\d{2})\([^\)]+\)[^~]*~[^0-9]*(\d{4})\.(\d{2})\.(\d{2})',
+        text
+    )
+    if date_match:
+        return (
+            f"{date_match.group(1)}-{date_match.group(2)}-{date_match.group(3)}",
+            f"{date_match.group(4)}-{date_match.group(5)}-{date_match.group(6)}",
+        )
+
+    date_match = re.search(
+        r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일[^~]*~[^0-9]*(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일',
+        text
+    )
+    if date_match:
+        return (
+            f"{date_match.group(1)}-{int(date_match.group(2)):02d}-{int(date_match.group(3)):02d}",
+            f"{date_match.group(4)}-{int(date_match.group(5)):02d}-{int(date_match.group(6)):02d}",
+        )
+
+    return None, None
+
 def parse_krw_amount(number_text: str, unit: str) -> int:
     number = float(number_text.replace(',', ''))
-    if unit == '만원':
+    if '만' in unit:
         return int(number * 10000)
     return int(number)
 
 def extract_min_trade_krw(text: str, coin: str | None) -> int:
-    amount_pattern = re.compile(r'(\d+(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(만원|원)')
+    amount_pattern = re.compile(r'(\d+(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(만\s*원|만원|원)')
     candidates = []
 
     for match in amount_pattern.finditer(text):
