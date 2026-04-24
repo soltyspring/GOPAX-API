@@ -1,7 +1,37 @@
 {
-  "MSQ-KRW": {
-    "amount": 0.525,
-    "end_date": "2025-08-20"
-  }
+  "UP-KRW": [
+    {
+      "amount": 50500,
+      "start_date": "2026-03-31",
+      "end_date": "2026-04-13"
+    }
+  ],
+  "DEGEN-KRW": [
+    {
+      "amount": 50500,
+      "start_date": "2026-03-25",
+      "end_date": "2026-04-07"
+    }
+  ],
+  "ELSA-KRW": [
+    {
+      "amount": 50500,
+      "start_date": "2026-04-14",
+      "end_date": "2026-04-20"
+    }
+  ],
+  "STOC-KRW": [
+    {
+      "amount": 50500,
+      "start_date": "2026-04-16",
+      "end_date": "2026-04-25"
+    }
+  ],
+  "MEA-KRW": [
+    {
+      "amount": 50500,
+      "start_date": "2026-04-16",
+      "end_date": "2026-04-25"
+    }
+  ]
 }
-

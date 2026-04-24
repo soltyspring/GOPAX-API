@@ -1,0 +1,19 @@
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Local auth/session files
+*.session
+*.session-journal
+
+# Runtime output/state
+*.log
+filtered_messages.json
+pending_events.json
+seen_notices.json
+
+# Local backups/temp files
+*.bak
+systemctl
