@@ -44,6 +44,7 @@ load_env()
 CONFIG_PATH = env_path("COIN_CONFIG_PATH", BASE_DIR / "config.json")
 DISCORD_TOKEN = require_env("DISCORD_TOKEN")
 DISCORD_CHANNEL_ID = int(require_env("DISCORD_CHANNEL_ID"))
+DISCORD_MENTION = os.getenv("DISCORD_MENTION", "").strip()
 SEEN_PATH = env_path("SEEN_NOTICES_PATH", BASE_DIR / "seen_notices.json")
 PENDING_PATH = env_path("PENDING_EVENTS_PATH", BASE_DIR / "pending_events.json")
 
@@ -333,7 +334,9 @@ async def check_notices():
         suggested = event['min_krw'] // 2 + 500
         etype = event.get('event_type', 'N빵')
         view = EventConfirmView()
+        mention_line = f"{DISCORD_MENTION}\n" if DISCORD_MENTION else ""
         msg = await channel.send(
+            mention_line +
             f"🎉 **{etype} 이벤트 발견!**\n"
             f"• 코인: `{event['coin']}`\n"
             f"• 기간: `{event['start']} ~ {event['end']}`\n"
