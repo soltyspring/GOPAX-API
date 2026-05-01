@@ -92,11 +92,11 @@ def parse_nbang_event(notice: dict):
     }
 
 def extract_coin(title: str, text: str) -> str | None:
-    coin_match = re.search(r'\(([A-Z]{2,10})\)', title)
+    coin_match = re.search(r'\(([A-Z0-9]{1,10})\)', title)
     if coin_match:
         return coin_match.group(1) + '-KRW'
 
-    coin_match = re.search(r'\b([A-Z]{2,10})\s*(?:N빵|매일 딸깍|데일리|리뉴얼|거래)', text)
+    coin_match = re.search(r'\b([A-Z0-9]{1,10})\s*(?:N빵|매일 딸깍|데일리|리뉴얼|거래)', text)
     if coin_match:
         return coin_match.group(1) + '-KRW'
 
